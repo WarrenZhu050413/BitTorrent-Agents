@@ -1,5 +1,11 @@
 #!/usr/bin/python
 
+# This is a dummy peer that just illustrates the available information your peers 
+# have available.
+
+# You'll want to copy this file to AgentNameXXX.py for various versions of XXX,
+# probably get rid of the silly logging messages, and then add more logic.
+
 import random
 import logging
 
@@ -7,41 +13,7 @@ from messages import Upload, Request
 from util import even_split
 from peer import Peer
 
-"""
-Implement the BitTorrent reference client, including 
-rarest-first, reciprocation and optimistic unblocking
-
-Rarest-first:
-Reciprocation:
-Optimistic unblocking: 
-
-1. Re-announces itself to the tracker every 30 min
-2. Initiates a connection to each peer it learns about 
-3. Accepts all connection requests.
-4. Sends a "have-piece" message to each neighbor whenever it obtains a new piece 
-5. Tracks the availability by maintaining a count of its neighbors that have each piece 
-6. Uses a rarest-first algo to decide which pieces to request 
-7. Equal-split capacity
-
-Steps each round: 
-- Happens every 10 seconds 
-- Or when an unblocked peer leaves the neighborhood
-
-1. Order peers in decreasing order of the avg
-download rate received from them during the 
-last 20 seconds (breaking ties randomly)
-
-2. Request a piece from the first m-1 (m = 4) peers in the list
-
-3. Optimisticaly unblock an interested peer every 3 rounds, 
-selected at random. Leave the peer unblocked for the next 
-3 rounds. 
-
-4. Difference in behavior at the beginning and the end 
-*(is this necessary? Not sure. End of p.118)
-"""
-
-class KCC_std(Peer):
+class Dummy(Peer):
     def post_init(self):
         print(("post_init(): %s here!" % self.id))
         self.dummy_state = dict()
@@ -60,6 +32,7 @@ class KCC_std(Peer):
         needed_pieces = list(filter(needed, list(range(len(self.pieces)))))
         np_set = set(needed_pieces)  # sets support fast intersection ops.
 
+
         logging.debug("%s here: still need pieces %s" % (
             self.id, needed_pieces))
 
@@ -71,25 +44,26 @@ class KCC_std(Peer):
         logging.debug("look at the AgentHistory class in history.py for details")
         logging.debug(str(history))
 
-        requests = []   # A list of lists, requesting all the pieces needed 
-        # Symmetry breaking 
+        requests = []   # We'll put all the things we want here
+        # Symmetry breaking is good...
         random.shuffle(needed_pieces)
         
         # Sort peers by id.  This is probably not a useful sort, but other 
         # sorts might be useful
-        peers.sort(key=lambda p: p.id) # Sorts peers by id, in ascending order [1, 2, 3, 4...]
+        peers.sort(key=lambda p: p.id)
         # request all available pieces from all peers!
         # (up to self.max_requests from each)
-        
         for peer in peers:
             av_set = set(peer.available_pieces)
             isect = av_set.intersection(np_set)
-            n = min(self.max_requests, len(isect)) 
-
-            # Rarest-first
-
+            n = min(self.max_requests, len(isect))
+            # More symmetry breaking -- ask for random pieces.
+            # This would be the place to try fancier piece-requesting strategies
+            # to avoid getting the same thing from multiple peers at a time.
             for piece_id in random.sample(isect, n):
-                
+                # aha! The peer has this piece! Request it.
+                # which part of the piece do we need next?
+                # (must get the next-needed blocks in order)
                 start_block = self.pieces[piece_id]
                 r = Request(self.id, peer.id, piece_id, start_block)
                 requests.append(r)
