@@ -73,7 +73,8 @@ class History:
 
     def peer_history(self, peer_id):
         return AgentHistory(peer_id, self.downloads[peer_id], self.uploads[peer_id])
-
+     
+    
     def last_round(self):
         """index of the last completed round"""
         p = self.peer_ids[0]

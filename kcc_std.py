@@ -92,6 +92,7 @@ class kcc_std(Peer):
 
         # Sort piece count in ascending order
         piece_counts = count_peers_with_pieces(peers, needed_pieces)
+        print("piece_counts", piece_counts)
         piece_counts_sorted = sorted(piece_counts.items(), key=lambda x: x[1])
         request_counts = {piece_id: 0 for piece_id in needed_pieces}
 
@@ -102,8 +103,11 @@ class kcc_std(Peer):
                     start_block = self.pieces[piece_id]
                     r = Request(self.id, peer.id, piece_id, start_block)
                     requests.append(r)
+                    
                     request_counts[piece_id] += 1
                     num_request_per_peer += 1
+        print('requests: mfs')
+        print(requests)
         return requests 
         ### We are assuming that we want to request to at most 3 peers with the same block
         ### for redundancy purposes
@@ -134,59 +138,71 @@ class kcc_std(Peer):
         
         # Step 1: Order peers in decreasing order of the avg download rate received from them
         # during the last 20 seconds (breaking ties randomly)
+        
         my_history = history
         my_downloads = my_history.downloads # list of lists of downloads every round
-        last_2_rounds = my_downloads[len(my_downloads)-2, len(my_downloads)] # list of 2 download lists 
-    
+        
+        last_2_rounds = my_downloads[len(my_downloads)-2: len(my_downloads)] # list of 2 download lists 
+
     
         peer_ids = [p.id for p in peers]
-        num_downloaded = dict((pid, 0) for pid in peer_ids)
-        for j in range(2):
-            for i in range(len(last_2_rounds[j])):
-                num_downloaded[last_2_rounds[j][i].from_id] = num_downloaded[last_2_rounds[0][i].from_id] + last_2_rounds[j][i].blocks
         
-        peers = sorted(peers, key = lambda p: num_downloaded[p], reverse = True)
-    
+        num_downloaded = dict((pid, 0) for pid in peer_ids)
+        if len(last_2_rounds) > 1:
+            for j in range(2):
+                for i in range(len(last_2_rounds[j])):
+                    num_downloaded[last_2_rounds[j][i].from_id] = num_downloaded[last_2_rounds[j][i].from_id] + last_2_rounds[j][i].blocks
+            
+            peers = sorted(peers, key = lambda p: num_downloaded[p.id], reverse = True)
+        elif len(last_2_rounds) == 1:
+
+            for i in range(len(last_2_rounds[0])):
+                num_downloaded[last_2_rounds[0][i].from_id] = num_downloaded[last_2_rounds[0][i].from_id] + last_2_rounds[0][i].blocks
+            
+            peers = sorted(peers, key = lambda p: num_downloaded[p.id], reverse = True)
+        else:
+            peers = random.shuffle(peers)
         
         # Step 2: Request a piece from the first m-1 (m = 4) peers in the list
         to_upload = []
         m = 4
-        if peers is not None: 
+        if peers is not None:
             if len(peers) >= m:
                 top_peers = peers[:m-1]
             else: 
                 top_peers = peers
+        else: 
+            top_peers = []
         """Assumption: We will not optimistically unblock another person"""
 
         # Step 3: Optimistically unblock an interested peer every 3 rounds
 
-        if self.current_round % 3 == 0:
+        if history.current_round() % 3 == 0:
             interested = [request.requester_id for request in requests]
             interested_peers = []
-            
-            for peer in peers:
-                if peer.id in interested:
-                    interested_peers.append(peer)
-            
+            if peers is not None:
+                for peer in peers:
+                    if peer.id in interested:
+                        interested_peers.append(peer)
+                
             interested_nontop = set(interested_peers) - set(top_peers)
-            
+                
             if interested_nontop:
                 unblocked_peer = random.choice(interested_nontop) 
                 self.dummy_state["unblocked_peer"] = unblocked_peer
             # Leave the peer unblocked for the next 3 rounds
             elif "unblocked_peer" in self.dummy_state.keys():
                 unblocked_peer = self.dummy_state["unblocked_peer"]
-                logging.debug("Continuing to unblock peer %s" % unblocked_peer)
+                
             else:
                 unblocked_peer = None
-                
+        else:
+            unblocked_peer = None       
         # Add the optimistically unblocked peer to the list of top peers
         if unblocked_peer is not None:
             top_peers.append(unblocked_peer)
 
-        logging.debug("Selected top peers: %s" % [peer.id for peer in top_peers])
-        logging.debug("%s again.  It's round %d." % (
-            self.id, round))
+      
         
         if len(top_peers) == 0:
             logging.debug("No one wants my pieces!")
@@ -196,16 +212,21 @@ class kcc_std(Peer):
             logging.debug("Still here: uploading to a random peer")
 
             # Upload to the top 3 peers in the list 
+            
             chosen = [p.id for p in top_peers]
+            
+            print('mother fuckers')
             # Evenly "split" my upload bandwidth among the one chosen requester
             ''' rounds down for the bandwidth per peer uploaded to'''
             bw_forall = self.up_bw / len(top_peers)
+            
             
 
         # create actual uploads out of the list of peer ids and bandwidths
         if len(top_peers) != 0:
             uploads = [Upload(self.id, peer_id, bw_forall)
                    for peer_id in chosen]
+            
             return uploads
         return []
           
