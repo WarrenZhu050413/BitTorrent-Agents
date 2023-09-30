@@ -10,7 +10,7 @@ from peer import Peer
 
 class kcc_tourney(Peer):
     def post_init(self):
-        print(("post_init(): %s here!" % self.id))
+        print("post_init(): %s here!" % self.id)
         self.dummy_state = dict()
         self.dummy_state["cake"] = "lie"
     
@@ -53,19 +53,12 @@ class kcc_tourney(Peer):
                 for piece in peer.available_pieces:
                     if piece in piece_counts:
                         piece_counts[piece] += 1
-                        
+            
             return piece_counts
 
-        # Sort piece count in ascending order, with modifications
+        # Sort piece count in ascending order
         piece_counts = count_peers_with_pieces(peers, needed_pieces)
-        thirtieth_percentile = int(len(piece_counts) * 0.3)
-        fiftieth_percentile = int(len(piece_counts) * 0.5)
-        top_thirty = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[:thirtieth_percentile]
-        thirty_to_fifty = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[thirtieth_percentile: fiftieth_percentile]
-        fifty_after = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[fiftieth_percentile:]
-        piece_counts_sorted = thirty_to_fifty + top_thirty + fifty_after
-
-
+        piece_counts_sorted = sorted(piece_counts.items(), key=lambda x: x[1])
         request_counts = {piece_id: 0 for piece_id in needed_pieces}
         
         for piece_id_tuple in piece_counts_sorted:
@@ -73,11 +66,10 @@ class kcc_tourney(Peer):
                 random.shuffle(peers)
             else:
                 peers = []
-            
             for peer in peers: 
                 num_request_per_peer = 0 
                 
-                if piece_id_tuple[0] in peer.available_pieces and num_request_per_peer < self.max_requests and request_counts[piece_id_tuple[0]] <= 3:
+                if piece_id_tuple[0] in peer.available_pieces and num_request_per_peer < self.max_requests:
                     start_block = self.pieces[piece_id_tuple[0]]
                     r = Request(self.id, peer.id, piece_id_tuple[0], start_block)
                     requests.append(r)
@@ -87,19 +79,8 @@ class kcc_tourney(Peer):
         if len(requests) > 0:
             random.shuffle(requests)
         return requests
-
-        """
-        We are employing a rarest-first algorithm, with certain alterations: 
-
-        1. We are assuming that we want to request to at most 3 peers with the same block
-        because of redundancy
-
-        2. We are also requesting the top 10 percentile of most desired pieces after the 10th to 40th percentile, 
-        because we assume that others will employ a request strategy similar to rarest-first, which means that 
-        the rarest pieces will be requested first by most people, so we don't need to request those pieces first
-         as they will become common. 
-        """
-
+        ### We are assuming that we want to request to at most 3 peers with the same block
+        ### for redundancy purposes
 
     def uploads(self, requests, peers, history):
         """

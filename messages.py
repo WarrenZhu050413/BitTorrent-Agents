@@ -2,9 +2,9 @@
 
 class Upload:
     def __init__(self, from_id, to_id, up_bw):
-        self.from_id = from_id
-        self.to_id = to_id
-        self.bw = up_bw
+        self.from_id = from_id #who did the agent upload from 
+        self.to_id = to_id #who did the agent upload to 
+        self.bw = up_bw 
 
     def __repr__(self):
         return "Upload(from_id = %s, to_id=%s, bw=%d)" % (
