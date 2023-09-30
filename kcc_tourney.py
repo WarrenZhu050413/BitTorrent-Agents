@@ -14,7 +14,6 @@ class kcc_tourney(Peer):
         self.dummy_state = dict()
         self.dummy_state["cake"] = "lie"
     
-    
     def requests(self, peers, history):
         """
         peers: available info about the peers (who has what pieces)
@@ -57,26 +56,38 @@ class kcc_tourney(Peer):
                         
             return piece_counts
 
-        # Sort piece count in ascending order
+        # Sort piece count in ascending order, with modifications
         piece_counts = count_peers_with_pieces(peers, needed_pieces)
         tenth_percentile = int(len(piece_counts) * 0.1)
         fortieth_percentile = int(len(piece_counts) * 0.4)
         top_ten = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[:tenth_percentile]
         ten_to_fourty = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[tenth_percentile: fortieth_percentile]
-        fourty_after = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[fourtieth_percentile:]
+        fourty_after = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[fortieth_percentile:]
         piece_counts_sorted = ten_to_fourty + top_ten + fourty_after
 
+
         request_counts = {piece_id: 0 for piece_id in needed_pieces}
-        for piece_id, count in piece_counts_sorted:
+        
+        for piece_id_tuple in piece_counts_sorted:
+            if len(peers) > 0:
+                random.shuffle(peers)
+            else:
+                peers = []
+            
             for peer in peers: 
                 num_request_per_peer = 0 
-                if piece_id in peer.available_pieces and request_counts[piece_id] <= 3 and num_request_per_peer <= peer.max_requests:
-                    start_block = self.pieces[piece_id]
-                    r = Request(self.id, peer.id, piece_id, start_block)
+                
+                if piece_id_tuple[0] in peer.available_pieces and num_request_per_peer < self.max_requests and request_counts[piece_id_tuple[0]] <= 3:
+                    start_block = self.pieces[piece_id_tuple[0]]
+                    r = Request(self.id, peer.id, piece_id_tuple[0], start_block)
                     requests.append(r)
-                    request_counts[piece_id] += 1
+                    
+                    request_counts[piece_id_tuple[0]] += 1
                     num_request_per_peer += 1
-        return requests 
+        if len(requests) > 0:
+            random.shuffle(requests)
+        return requests
+
         """
         We are employing a rarest-first algorithm, with certain alterations: 
 
@@ -88,6 +99,7 @@ class kcc_tourney(Peer):
         the rarest pieces will be requested first by most people, so we don't need to request those pieces first
          as they will become common. 
         """
+
 
     def uploads(self, requests, peers, history):
         """
@@ -112,6 +124,7 @@ class kcc_tourney(Peer):
             logging.debug("No one wants my pieces!")
             chosen = []
             bws = []
+            return []
         else:
             logging.debug("Still here: uploading to a random peer")
             # change my internal state for no reason
@@ -132,9 +145,9 @@ class kcc_tourney(Peer):
             ### We choose to estimate the amount of capcity to require another peer to 
             ### unblock us as 25 percent of our own up_bw because the up_bw of each of 
             ### the agents are the same
-
+            u_is = {peer.id: 0.25 * self.up_bw for peer in peers}
             if round == 0:
-                u_is = {peer.id: 0.25 * self.up_bw for peer in peers}
+                u_is = u_is
             else:
                 for peer in peers:
                     unblockedforPastRrounds = False #shouldn't this be initialized to false?
@@ -165,6 +178,7 @@ class kcc_tourney(Peer):
         
 
             # Estimate d_i
+            d_is = {peer.id: 0 for peer in peers}
             downloaded_from_counter = {peer.id: 0 for peer in peers}
             for peer in peers: 
                 for download in history.downloads[-1]: 
@@ -173,7 +187,7 @@ class kcc_tourney(Peer):
 
             for peer in peers: 
                 if downloaded_from_counter[peer.id] == 0: 
-                    d_is[peer.id] = self.bw/4 #Directly estimate by 1/4 of my own bandwidth
+                    d_is[peer.id] = self.up_bw/4 #Directly estimate by 1/4 of my own bandwidth
                 else:
                     d_is[peer.id] = downloaded_from_counter[peer.id]
 
@@ -202,9 +216,7 @@ class kcc_tourney(Peer):
                 if m > 0:
                     for i in range(m):
                         uploads.append(Upload(self.id, peers[i].id, u_is[peers[i].id]))
-
                 
-
                 while sum < self.up_bw: 
                     available_numbers = [i for i in range(m+1, len(peers))]
                     if self.up_bw - sum < self.up_bw/4:
@@ -220,4 +232,3 @@ class kcc_tourney(Peer):
 
                 return uploads
 
-                
