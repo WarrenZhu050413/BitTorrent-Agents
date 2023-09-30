@@ -92,26 +92,30 @@ class kcc_std(Peer):
 
         # Sort piece count in ascending order
         piece_counts = count_peers_with_pieces(peers, needed_pieces)
-        print("piece_counts", piece_counts)
         piece_counts_sorted = sorted(piece_counts.items(), key=lambda x: x[1])
         request_counts = {piece_id: 0 for piece_id in needed_pieces}
-
-        for piece_id in piece_counts_sorted:
+        
+        for piece_id_tuple in piece_counts_sorted:
+            if len(peers) > 0:
+                random.shuffle(peers)
+            else:
+                peers = []
+            
             for peer in peers: 
                 num_request_per_peer = 0 
-                if piece_id in peer.available_pieces and request_counts[piece_id] <= 3 and num_request_per_peer <= peer.max_requests:
-                    start_block = self.pieces[piece_id]
-                    r = Request(self.id, peer.id, piece_id, start_block)
+                
+                if piece_id_tuple[0] in peer.available_pieces and num_request_per_peer < self.max_requests:
+                    start_block = self.pieces[piece_id_tuple[0]]
+                    r = Request(self.id, peer.id, piece_id_tuple[0], start_block)
                     requests.append(r)
                     
-                    request_counts[piece_id] += 1
+                    request_counts[piece_id_tuple[0]] += 1
                     num_request_per_peer += 1
-        print('requests: mfs')
-        print(requests)
-        return requests 
+        if len(requests) > 0:
+            random.shuffle(requests)
+        return requests
         ### We are assuming that we want to request to at most 3 peers with the same block
         ### for redundancy purposes
-
 
     def uploads(self, requests, peers, history):
         """
@@ -177,33 +181,28 @@ class kcc_std(Peer):
 
         # Step 3: Optimistically unblock an interested peer every 3 rounds
 
-        if history.current_round() % 3 == 0:
+        if history.current_round() == 0:
+            unblocked_peer = None
+        elif history.current_round() % 3 == 0:
             interested = [request.requester_id for request in requests]
             interested_peers = []
             if peers is not None:
                 for peer in peers:
                     if peer.id in interested:
                         interested_peers.append(peer)
-                
-            interested_nontop = set(interested_peers) - set(top_peers)
-                
-            if interested_nontop:
-                unblocked_peer = random.choice(interested_nontop) 
-                self.dummy_state["unblocked_peer"] = unblocked_peer
-            # Leave the peer unblocked for the next 3 rounds
-            elif "unblocked_peer" in self.dummy_state.keys():
-                unblocked_peer = self.dummy_state["unblocked_peer"]
-                
+            if interested_peers:
+                unblocked_peer = random.choice(interested_peers)
             else:
                 unblocked_peer = None
         else:
-            unblocked_peer = None       
-        # Add the optimistically unblocked peer to the list of top peers
+            unblocked_peer = None
+
+        
         if unblocked_peer is not None:
-            top_peers.append(unblocked_peer)
+            if unblocked_peer not in top_peers:
+                top_peers.append(unblocked_peer)
 
       
-        
         if len(top_peers) == 0:
             logging.debug("No one wants my pieces!")
             chosen = []

@@ -58,12 +58,12 @@ class kcc_tourney(Peer):
 
         # Sort piece count in ascending order, with modifications
         piece_counts = count_peers_with_pieces(peers, needed_pieces)
-        tenth_percentile = int(len(piece_counts) * 0.1)
-        fortieth_percentile = int(len(piece_counts) * 0.4)
-        top_ten = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[:tenth_percentile]
-        ten_to_fourty = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[tenth_percentile: fortieth_percentile]
-        fourty_after = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[fortieth_percentile:]
-        piece_counts_sorted = ten_to_fourty + top_ten + fourty_after
+        thirtieth_percentile = int(len(piece_counts) * 0.3)
+        fiftieth_percentile = int(len(piece_counts) * 0.5)
+        top_thirty = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[:thirtieth_percentile]
+        thirty_to_fifty = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[thirtieth_percentile: fiftieth_percentile]
+        fifty_after = sorted(piece_counts.items(), key=lambda x: x[1], reverse=False)[fiftieth_percentile:]
+        piece_counts_sorted = thirty_to_fifty + top_thirty + fifty_after
 
 
         request_counts = {piece_id: 0 for piece_id in needed_pieces}
