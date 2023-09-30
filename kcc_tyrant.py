@@ -125,9 +125,9 @@ class kcc_tyrant(Peer):
             ### We choose to estimate the amount of capcity to require another peer to 
             ### unblock us as 25 percent of our own up_bw because the up_bw of each of 
             ### the agents are the same
-
+            u_is = {peer.id: 0.25 * self.up_bw for peer in peers}
             if round == 0:
-                u_is = {peer.id: 0.25 * self.up_bw for peer in peers}
+                u_is = u_is
             else:
                 for peer in peers:
                     unblockedforPastRrounds = False #shouldn't this be initialized to false?
